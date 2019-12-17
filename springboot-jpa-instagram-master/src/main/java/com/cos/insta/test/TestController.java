@@ -1,23 +1,94 @@
 package com.cos.insta.test;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.AsynchronousFileChannel;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.Future;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.cos.insta.model.Follow;
 import com.cos.insta.model.Image;
 import com.cos.insta.model.Likes;
+import com.cos.insta.model.Tag;
 import com.cos.insta.model.User;
+import com.cos.insta.repository.ImageRepository;
+import com.cos.insta.repository.UserRepository;
+import com.cos.insta.service.MyUserDetail;
+import com.cos.insta.util.Utils;
 
 @Controller
 public class TestController {
 
+	@Autowired
+	private UserRepository mUserRepository;
+	
+	@Autowired
+	private ImageRepository mImageRepository;
+	
+	@Value("${file.path}")
+	private String fileRealPath;
+	
+	// 이미지 동기처리 하기!!
+	@PostMapping("/test/image/uploadProc")
+	public String testImageUploadProc(@AuthenticationPrincipal MyUserDetail userDetail,
+			@RequestParam("file") MultipartFile file, @RequestParam("caption") String caption,
+			@RequestParam("location") String location, @RequestParam("tags") String tags) throws IOException{
+	
+		// 이미지 업로드 수행
+		UUID uuid = UUID.randomUUID();
+		String uuidFilename = uuid + "_" + file.getOriginalFilename();
+	
+		Path filePath = Paths.get(fileRealPath + uuidFilename);
+		if (!Files.exists(filePath)) {
+			Files.createFile(filePath);
+		}
+	
+		AsynchronousFileChannel fileChannel = AsynchronousFileChannel.open(filePath, StandardOpenOption.WRITE);
+	
+		ByteBuffer buffer = ByteBuffer.allocate((int) file.getSize());
+	
+		buffer.put(file.getBytes());
+		buffer.flip();
+	
+		Future<Integer> operation = fileChannel.write(buffer, 0);
+		buffer.clear();
+	
+		while (!operation.isDone());
+	
+		System.out.println("Write done");
+	
+		return "redirect:/";
+	}
+	
+	@GetMapping("/test/user/{id}")
+	public @ResponseBody User testUser(@PathVariable int id) {
+		Optional<User> oUser = mUserRepository.findById(id);
+		User user = oUser.get();
+		return user;
+	}
+	
 	@GetMapping("/test/home")
 	public String testHome() {
 		return "home";
@@ -173,7 +244,42 @@ public class TestController {
 		
 		return follows;
 	}
+	
+	@GetMapping("/test/login")
+	public String testLogin() {
+		return "auth/login";
+	}
+	
+	@GetMapping("/test/join")
+	public String testJoin() {
+		return "auth/join";
+	}
 
+	@GetMapping("/test/profile")
+	public String testProfile() {
+		return "user/profile";
+	}
+	
+	@GetMapping("/test/profileEdit")
+	public String testProfileEdit() {
+		return "user/profile_edit";
+	}
+	
+	@GetMapping("/test/feed")
+	public String testFeed() {
+		return "image/feed";
+	}
+	
+	@GetMapping("/test/imageUpload")
+	public String testImageUpload() {
+		return "image/image_upload";
+	}
+	
+	@GetMapping("/test/explore")
+	public String testExplore() {
+		return "image/explore";
+	}
+	
 }
 
 
